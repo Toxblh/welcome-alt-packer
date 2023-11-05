@@ -15,7 +15,7 @@ fi
 
 # Установка необходимых пакетов
 echo "Введите пароль от root пользователя, для установки необходимых для сборки пакетов"
-su - -c 'epm install etersoft-build-utils'
+su - -c 'epm install -y etersoft-build-utils hasher'
 
 # Интерактивный опросник
 read -p "Введите ваше имя и фамилию латиницей, например - Anton Palgunov: " FULLNAME
