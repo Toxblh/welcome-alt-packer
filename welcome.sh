@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Сохраняем юзерней пользователя для hasher
+SAVE_USER=$USER
+
 # Вопрос пользователю о необходимости установки sudo
 read -p "Установить sudo в систему? (да/нет): " RESPONSE
 
@@ -15,7 +18,10 @@ fi
 
 # Установка необходимых пакетов
 echo "Введите пароль от root пользователя, для установки необходимых для сборки пакетов"
-su - -c 'epm install -y etersoft-build-utils hasher'
+su - -c "epm install -y etersoft-build-utils hasher faketime gear gear-sh-functions girar-show && \
+            systemctl enable --now hasher-privd.service && \
+            echo 'allowed_mountpoints=/proc' > /etc/hasher-priv/system && \
+            hasher-useradd $SAVE_USER"
 
 # Интерактивный опросник
 read -p "Введите ваше имя и фамилию латиницей, например - Anton Palgunov: " FULLNAME
@@ -31,6 +37,15 @@ cat << EOF > ~/.rpmmacros
 EOF
 
 cat ~/.rpmmacros
+
+# Настройка hasher
+mkdir ~/.hasher
+cat << EOF > ~/.hasher/config
+packager="${FULLNAME} <${USERNAME}@altlinux.org>"
+known_mountpoints=/proc
+EOF
+
+cat ~/.hasher/config
 
 # Конфигурация git
 git config --global user.email ${USERNAME}@altlinux.org
@@ -54,3 +69,55 @@ cat << EOF >> ~/.ssh/config
 EOF
 
 cat ~/.ssh/config
+
+echo -e "\e[96mTL;DR полезных команд\e[39m
+
+\e[93m## Загрузить пакет ##\e[39m
+
+- Проверка наличия пакета в Сизифе
+    \e[92mrpmgp -c название_пакета\e[39m
+
+- Загрузка уже собранного в Сизиф пакета
+    \e[92mrpmgp -g neofetch\e[39m
+
+\e[93m## Сборка в системе ##\e[39m
+
+- Собрать пакет в системе
+    \e[92mrpmbb\e[39m
+
+- Отладить только шаг установки файлов
+    \e[92mrpmbb -i\e[39m
+
+- Отладить только шаг упаковки пакета
+    \e[92mrpmbb -p\e[39m
+
+\e[93m## Сборка в Hasher ##\e[39m
+
+- Собрать пакет в hasher
+    \e[92mrpmbsh\e[39m
+
+- Собрать и установить '-i' внутри и отправить '-u' в Сизиф
+    \e[92mrpmbsh -i\e[39m
+
+\e[93m## Отправка пакета ##\e[39m
+
+- Отправить пакет на сборку в Сизиф
+    \e[92mrpmbs -u\e[39m
+
+\e[93m## Обновление пакета ##\e[39m
+
+- Обновление исходников, если в Source указан URL к файлу с исходниками:
+        - # Source-url: http://example.com/%name/%name-%version.zip
+        - # Source-git: http://github.com/user/repo.git
+
+    \e[92mrpmgs [-f] %новая версия, как в тегах%\e[39m
+
+- Автоматическое обновление, скачает обновление, соберёт, запустит тест и после отправит в Сизиф
+    \e[92mrpmrb новая_версия\e[39m
+
+Полезные ссылки: 
+- \e[94mhttps://www.altlinux.org/Сборка_пакетов_(etersoft-build-utils)\e[39m -  Короткий и быстрый старт
+- \e[94mhttps://alt-packaging-guide.github.io\e[39m - Руководство о сборке пакетов
+- \e[94mhttps://www.altlinux.org/Etersoft-build-utils_howto\e[39m - Полное руководство по Этерсофт утилит
+
+\e[91mСреда настроена и готова к работе. Для использования hasher выйдите и зайдите в сессию.\e[39m"
