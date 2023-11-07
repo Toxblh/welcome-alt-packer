@@ -3,12 +3,26 @@
 # Сохраняем юзерней пользователя для hasher
 SAVE_USER=$USER
 
+echo -e " __      __   _                      \033[1;33m_   _ _\033[0m     ___         _           "
+echo -e " \ \    / /__| |__ ___ _ __  ___    \033[1;33m/_\ | | |_\033[0m  | _ \__ _ __| |_____ _ _ "
+echo -e "  \ \/\/ / -_) / _/ _ \ '  \/ -_)  \033[1;33m/ _ \| |  _|\033[0m |  _/ _\` / _| / / -_) '_|"
+echo -e "   \_/\_/\___|_\__\___/_|_|_\___| \033[1;33m/_/ \_\_|\__|\033[0m |_| \__,_\__|_\_\___|_|"
+echo ""
+echo -e "\033[1;37mДобро пожаловать в настройку среду для сборки пакетов Альт Linux\033[0m"
+echo ""
+
+# Интерактивный опросник
+
+read -p $'Введите ваше имя и фамилию латиницей, например - \033[1;30mAnton Palgunov\033[0m: ' FULLNAME
+read -p $'Введите ваш username, что часть email@altlinux.org, например - \033[1;30mtoxblh\033[0m: ' USERNAME
+
 # Вопрос пользователю о необходимости установки sudo
 read -p "Установить sudo в систему? (да/нет): " RESPONSE
 
 if [[ "$RESPONSE" =~ ^([дД]|[yY]|[дД][аА]|[yY][eE][sS])$ ]]
 then
     # Используем su для выполнения команды от имени рута
+    echo ""
     echo "Введите пароль от root пользователя, для установки sudo"
     su - -c 'control sudowheel:enabled'
 
@@ -17,15 +31,12 @@ else
 fi
 
 # Установка необходимых пакетов
+echo ""
 echo "Введите пароль от root пользователя, для установки необходимых для сборки пакетов"
 su - -c "epm install -y etersoft-build-utils hasher faketime gear gear-sh-functions girar-show && \
             systemctl enable --now hasher-privd.service && \
             echo 'allowed_mountpoints=/proc' > /etc/hasher-priv/system && \
             hasher-useradd $SAVE_USER"
-
-# Интерактивный опросник
-read -p "Введите ваше имя и фамилию латиницей, например - Anton Palgunov: " FULLNAME
-read -p "Введите ваш username, что часть email@altlinux.org, например - toxblh: " USERNAME
 
 # Создание файла ~/.rpmmacros
 cat << EOF > ~/.rpmmacros
