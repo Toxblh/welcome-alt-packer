@@ -5,5 +5,5 @@ Init system to start to build packages for Alt Linux / Система иници
 How to usage? / Как использовать? 
 
 ```shell
-curl -sSL https://raw.githubusercontent.com/Toxblh/welcome-alt-packer/master/welcome.sh | bash
+curl -sSL https://raw.githubusercontent.com/Toxblh/welcome-alt-packer/master/welcome.sh > welcome.sh && chmod +x welcome.sh && ./welcome.sh
 ```
