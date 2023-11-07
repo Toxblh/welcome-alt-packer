@@ -33,7 +33,7 @@ fi
 # Установка необходимых пакетов
 echo ""
 echo "Введите пароль от root пользователя, для установки необходимых для сборки пакетов"
-su - -c "epm install -y etersoft-build-utils hasher faketime gear gear-sh-functions girar-show && \
+su - -c "epm install -y etersoft-build-utils hasher faketime gear gear-sh-functions && \
             systemctl enable --now hasher-privd.service && \
             echo 'allowed_mountpoints=/proc' > /etc/hasher-priv/system && \
             hasher-useradd $SAVE_USER"
