@@ -1,5 +1,48 @@
 #!/bin/bash
 
+# Функция для выполнения команды с запросом пароля и ограничением на количество попыток
+execute_with_retry() {
+  local command="$1"
+  local max_attempts=3
+  local attempt_counter=0
+  
+  # Перечисляем возможные строки ошибок аутентификации на разных языках
+  local auth_errors=("Authentication failure" "Аутентификация"
+                     "authentification échouée" "Fehler bei der Authentifizierung"
+                     "autenticación fallida")
+
+  while [ $attempt_counter -lt $max_attempts ]; do
+    ((attempt_counter++))
+    error_output=$(su - -c "$command" 2>&1)
+    retval=$?
+
+    # Показ перехваченого вывода
+    echo $error_output
+
+    if [ $retval -eq 0 ]; then
+      # Успех, выходим
+      return 0
+    else
+      for error_msg in "${auth_errors[@]}"; do
+        if [[ $error_output == *"$error_msg"* ]]; then
+          echo "Неверный пароль, попытка $attempt_counter из $max_attempts."
+          # Нашли совпадение, но команда не выполнена успешно, прервать эту while иттерацию
+
+          if [ $attempt_counter -eq $max_attempts ]; then
+            echo "Ошибка. Достигнут максимум попыток"
+            return 1
+          fi
+          
+          continue 2
+        fi
+      done
+
+      # Если мы здесь, значит, ошибка не связана с аутентификацией, выходим
+      return 0
+    fi
+  done
+}
+
 # Сохраняем юзерней пользователя для hasher
 SAVE_USER=$USER
 
@@ -24,7 +67,7 @@ then
     # Используем su для выполнения команды от имени рута
     echo ""
     echo "Введите пароль от root пользователя, для установки sudo"
-    su - -c 'control sudowheel:enabled'
+    execute_with_retry 'control sudowheel:enabled'
 
 else
     echo "Вы пропустили установку sudo."
@@ -33,10 +76,13 @@ fi
 # Установка необходимых пакетов
 echo ""
 echo "Введите пароль от root пользователя, для установки необходимых для сборки пакетов"
-su - -c "epm install -y etersoft-build-utils hasher faketime gear gear-sh-functions && \
+if ! execute_with_retry "epm install -y etersoft-build-utils hasher faketime gear gear-sh-functions && \
             systemctl enable --now hasher-privd.service && \
             echo 'allowed_mountpoints=/proc' > /etc/hasher-priv/system && \
-            hasher-useradd $SAVE_USER"
+            hasher-useradd $SAVE_USER"; then
+  echo "Команда не удалась после повторных попыток. Попробуйте ещё раз. Выход"
+  exit 1
+fi 
 
 # Создание файла ~/.rpmmacros
 cat << EOF > ~/.rpmmacros
@@ -65,6 +111,7 @@ git config --global user.name "${FULLNAME}"
 cat ~/.gitconfig
 
 # Добавление настроек в ~/.ssh/config
+if ! grep -q "gitery.altlinux.org" ~/.ssh/config; then
 cat << EOF >> ~/.ssh/config
  # Гитовница
    Host gitery
@@ -78,6 +125,7 @@ cat << EOF >> ~/.ssh/config
      User alt_${USERNAME}
      Port 222
 EOF
+fi
 
 cat ~/.ssh/config
 
