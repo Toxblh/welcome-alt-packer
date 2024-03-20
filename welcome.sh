@@ -67,7 +67,7 @@ then
     # Используем su для выполнения команды от имени рута
     echo ""
     echo "Введите пароль от root пользователя, для установки sudo"
-    execute_with_retry 'control sudowheel:enabled'
+    execute_with_retry 'control sudowheel enabled'
 
 else
     echo "Вы пропустили установку sudo."
