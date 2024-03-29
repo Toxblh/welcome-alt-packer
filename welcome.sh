@@ -56,8 +56,8 @@ echo ""
 
 # Интерактивный опросник
 
-read -p $'Введите ваше имя и фамилию латиницей, например - \033[1;30mAnton Palgunov\033[0m: ' FULLNAME
-read -p $'Введите ваш username, что часть email@altlinux.org, например - \033[1;30mtoxblh\033[0m: ' USERNAME
+read -p $'Введите ваше имя и фамилию латиницей, например - \033[1;32mAnton Palgunov\033[0m: ' FULLNAME
+read -p $'Введите ваш username, что часть email@altlinux.org, например - \033[1;32mtoxblh\033[0m: ' USERNAME
 
 # Вопрос пользователю о необходимости установки sudo
 read -p "Установить sudo в систему? (да/нет): " RESPONSE

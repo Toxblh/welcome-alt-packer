@@ -10,5 +10,5 @@ Init system to start to build packages for Alt Linux
 How to usage?
 
 ```shell
-curl -sSL https://raw.githubusercontent.com/Toxblh/welcome-alt-packer/master/welcome.sh > welcome.sh && chmod +x welcome.sh && ./welcome.sh
+bash -c "$(curl -fsSL https://github.com/Toxblh/welcome-alt-packer/raw/master/welcome.sh)"
 ```
