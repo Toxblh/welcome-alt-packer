@@ -122,7 +122,7 @@ EOF
 GITCONFIG="$HOME/.gitconfig"
 INCLUDE_BLOCK="[includeIf \"gitdir:${TEAM_DIR}/\"]"
 
-if ! grep -q "$INCLUDE_BLOCK" "$GITCONFIG" 2>/dev/null; then
+if ! grep -qF "$INCLUDE_BLOCK" "$GITCONFIG" 2>/dev/null; then
     echo "" >> "$GITCONFIG"
     echo "$INCLUDE_BLOCK" >> "$GITCONFIG"
     echo "    path = $CONFIG_PATH" >> "$GITCONFIG"
