@@ -152,7 +152,7 @@ cat << EOF >> ~/.ssh/config
      Port 222
 
  # Сборочница
-   Host gyle1
+   Host gyle
      HostName gyle.altlinux.org
      User alt_${USERNAME}
      Port 222
