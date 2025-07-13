@@ -117,6 +117,13 @@ cat > "$CONFIG_PATH" <<EOF
 [user]
     name = $FULLNAME
     email = ${USERNAME}@altlinux.org
+    signingkey = <CHANGE_ME FROM "gpg -k">
+
+[gpg]
+	format = openpgp
+
+[commit]
+	gpgsign = true
 EOF
 
 GITCONFIG="$HOME/.gitconfig"
@@ -212,3 +219,5 @@ echo -e "\e[96mTL;DR полезных команд\e[39m
 - \e[94mhttps://www.altlinux.org/Etersoft-build-utils_howto\e[39m - Полное руководство по Этерсофт утилит
 
 \e[91mСреда настроена и готова к работе. Для использования hasher выйдите и зайдите в сессию.\e[39m"
+
+echo "НЕ ЗАБУДЬ ОБНОВИТЬ GPG ключ в $CONFIG_PATH !"
