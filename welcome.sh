@@ -104,13 +104,45 @@ EOF
 
 cat ~/.hasher/config
 
+############
 # Конфигурация git
-git config --global user.email ${USERNAME}@altlinux.org
-git config --global user.name "${FULLNAME}"
+############
+TEAM_DIR="$HOME/alt-team"
+CONFIG_PATH="$HOME/.config/git/config-alt-team"
 
+mkdir -p "$TEAM_DIR"
+mkdir -p "$(dirname "$CONFIG_PATH")"
+
+cat > "$CONFIG_PATH" <<EOF
+[user]
+    name = $FULLNAME
+    email = ${USERNAME}@altlinux.org
+EOF
+
+GITCONFIG="$HOME/.gitconfig"
+INCLUDE_BLOCK="[includeIf \"gitdir:${TEAM_DIR}/\"]"
+
+if ! grep -q "$INCLUDE_BLOCK" "$GITCONFIG" 2>/dev/null; then
+    echo "" >> "$GITCONFIG"
+    echo "$INCLUDE_BLOCK" >> "$GITCONFIG"
+    echo "    path = $CONFIG_PATH" >> "$GITCONFIG"
+    echo "✅ Добавлен includeIf для $TEAM_DIR в ~/.gitconfig"
+else
+    echo "ℹ️ includeIf для $TEAM_DIR уже есть в ~/.gitconfig"
+fi
+
+echo -e '############\n# Git\n############\n'
+echo "gitconfig:"
 cat ~/.gitconfig
 
+echo "Конфигурация git Alt-team: $CONFIG_PATH"
+cat $CONFIG_PATH
+
+echo "Рабочая папка: $TEAM_DIR"
+
+############
 # Добавление настроек в ~/.ssh/config
+############
 if ! grep -q "gitery.altlinux.org" ~/.ssh/config; then
 cat << EOF >> ~/.ssh/config
  # Гитовница
