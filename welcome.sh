@@ -16,7 +16,7 @@ execute_with_retry() {
     error_output=$(su - -c "$command" 2>&1)
     retval=$?
 
-    # Показ перехваченого вывода
+    # Показ перехваченного вывода
     echo $error_output
 
     if [ $retval -eq 0 ]; then
@@ -96,7 +96,7 @@ EOF
 cat ~/.rpmmacros
 
 # Настройка hasher
-mkdir ~/.hasher
+mkdir -p ~/.hasher
 cat << EOF > ~/.hasher/config
 packager="${FULLNAME} <${USERNAME}@altlinux.org>"
 known_mountpoints=/proc
@@ -120,10 +120,10 @@ cat > "$CONFIG_PATH" <<EOF
     signingkey = <CHANGE_ME FROM "gpg -k">
 
 [gpg]
-	format = openpgp
+    format = openpgp
 
 [commit]
-	gpgsign = true
+    gpgsign = true
 EOF
 
 GITCONFIG="$HOME/.gitconfig"
@@ -152,17 +152,18 @@ echo "Рабочая папка: $TEAM_DIR"
 ############
 if ! grep -q "gitery.altlinux.org" ~/.ssh/config; then
 cat << EOF >> ~/.ssh/config
- # Гитовница
-   Host gitery
-     HostName gitery.altlinux.org
-     User alt_${USERNAME}
-     Port 222
 
- # Сборочница
-   Host gyle
-     HostName gyle.altlinux.org
-     User alt_${USERNAME}
-     Port 222
+# Гитовница
+Host gitery
+    HostName gitery.altlinux.org
+    User alt_${USERNAME}
+    Port 222
+
+# Сборочница
+Host gyle
+    HostName gyle.altlinux.org
+    User alt_${USERNAME}
+    Port 222
 EOF
 fi
 
