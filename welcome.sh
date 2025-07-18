@@ -68,7 +68,7 @@ check_service_running() {
 }
 
 check_user_in_hasher() {
-    groups "$1" 2>/dev/null | grep -q hasher
+    groups "$1" 2>/dev/null | grep -q "$1_a" && groups "$1" 2>/dev/null | grep -q "$1_b"
 }
 
 is_hasher_configured() {
@@ -114,7 +114,7 @@ get_gpg_keys() {
 showcmd()
 {
     local i
-    echo -e "\033[1;32m \$"
+    echo -en "\033[1;32m\$"
     for i in "$@" ; do
         echo -n " "
         # добавляем кавычки если есть пробелы
@@ -412,9 +412,9 @@ echo -e "\033[1;36m=== НАСТРОЙКА RPM ===\033[0m"
 
 if is_rpmmacros_configured; then
     show_success "Конфигурация RPM уже настроена"
-    echo -e "\033[0;37m--- Текущий ~/.rpmmacros ---\033[0m"
-    cat ~/.rpmmacros
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo -e "\033[0;37m--- Текущий ~/.rpmmacros ---\033[0m"
+    # cat ~/.rpmmacros
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
 else
     show_progress "Создаем конфигурацию RPM в ~/.rpmmacros"
 
@@ -441,9 +441,9 @@ else
 EOF
 
     show_success "Файл ~/.rpmmacros создан"
-    echo -e "\033[0;37m--- Содержимое ~/.rpmmacros ---\033[0m"
-    cat ~/.rpmmacros
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo -e "\033[0;37m--- Содержимое ~/.rpmmacros ---\033[0m"
+    # cat ~/.rpmmacros
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
     
     if [[ "$gpg_fingerprint" == *"<CHANGE_ME"* ]]; then
         echo ""
@@ -456,9 +456,9 @@ fi
 echo ""
 if [ -f ~/.hasher/config ] && grep -q "packager" ~/.hasher/config; then
     show_success "Конфигурация Hasher уже настроена"
-    echo -e "\033[0;37m--- Текущий ~/.hasher/config ---\033[0m"
-    cat ~/.hasher/config
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo -e "\033[0;37m--- Текущий ~/.hasher/config ---\033[0m"
+    # cat ~/.hasher/config
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
 else
     show_progress "Создаем конфигурацию Hasher в ~/.hasher/config"
     mkdir -p ~/.hasher
@@ -469,9 +469,9 @@ known_mountpoints=/proc
 EOF
 
     show_success "Файл ~/.hasher/config создан"
-    echo -e "\033[0;37m--- Содержимое ~/.hasher/config ---\033[0m"
-    cat ~/.hasher/config
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo -e "\033[0;37m--- Содержимое ~/.hasher/config ---\033[0m"
+    # cat ~/.hasher/config
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
 fi
 
 ############
@@ -486,20 +486,167 @@ JOIN_DIR="$TEAM_DIR/join"
 BACKUP_DIR="$TEAM_DIR/backup"
 mkdir -p "$JOIN_DIR" "$BACKUP_DIR"
 
-# Генерация SSH ключа
+# Опрос пользователя о ключах
 echo ""
-echo -e "\033[1;35m--- SSH ключ ---\033[0m"
+echo "Для работы с ALT Linux Team нужны SSH и GPG ключи."
+echo "Мы можем:"
+echo "  1. Использовать ваши существующие ключи"
+echo "  2. Создать новые специальные ключи для ALT Team"
+echo ""
+
+# Опрос про SSH ключ
+echo -e "\033[1;35m--- Настройка SSH ключа ---\033[0m"
 SSH_KEY_PATH="$HOME/.ssh/alt_team_ed25519"
+CREATE_SSH_KEY=false
+USE_EXISTING_SSH=false
 
 if [ -f "$SSH_KEY_PATH" ]; then
-    show_success "SSH ключ уже существует: $SSH_KEY_PATH"
-    echo "Публичный ключ:"
-    echo -e "\033[0;37m$(cat ${SSH_KEY_PATH}.pub)\033[0m"
-    
-    # Копируем публичный ключ в папку join
-    cp "${SSH_KEY_PATH}.pub" "$JOIN_DIR/ssh_public_key.pub"
-    show_success "Публичный SSH ключ скопирован в $JOIN_DIR/ssh_public_key.pub"
+    show_success "Специальный SSH ключ ALT Team уже существует: $SSH_KEY_PATH"
+    USE_EXISTING_SSH=true
 else
+    echo "Проверяем наличие SSH ключей в системе..."
+    if ls ~/.ssh/id_* >/dev/null 2>&1; then
+        show_success "Найдены существующие SSH ключи:"
+        for key in ~/.ssh/id_*; do
+            [[ "$key" != *.pub ]] && echo "  $key"
+        done
+        echo ""
+        read -p "Хотите использовать существующий SSH ключ или создать новый специально для ALT Team? (существующий/новый): " ssh_choice
+        
+        if [[ "$ssh_choice" =~ ^([сС]|[eE]|[сС][уУ][щЩ]|[eE][xX][iI][sS]).*$ ]]; then
+            show_success "Будем использовать существующий SSH ключ"
+            USE_EXISTING_SSH=true
+        else
+            show_progress "Создадим новый SSH ключ специально для ALT Team"
+            CREATE_SSH_KEY=true
+        fi
+    else
+        show_warning "SSH ключи не найдены в системе"
+        read -p "Создать новый SSH ключ для ALT Team? (да/нет): " create_ssh_response
+        if [[ "$create_ssh_response" =~ ^([дД]|[yY]|[дД][аА]|[yY][eE][sS])$ ]]; then
+            CREATE_SSH_KEY=true
+        else
+            show_warning "SSH ключ не будет создан. Настройте SSH ключ самостоятельно."
+        fi
+    fi
+fi
+
+# Опрос про GPG ключ
+echo ""
+echo -e "\033[1;35m--- Настройка GPG ключа ---\033[0m"
+CREATE_GPG_KEY=false
+USE_EXISTING_GPG=false
+
+# Проверяем есть ли уже GPG ключи с нашим email
+existing_gpg_keys=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep -A5 "${USERNAME}@altlinux.org" | grep "^sec" | cut -d: -f5)
+
+if [ -n "$existing_gpg_keys" ]; then
+    show_success "GPG ключ с email ${USERNAME}@altlinux.org уже существует"
+    USE_EXISTING_GPG=true
+else
+    # Проверяем наличие других GPG ключей
+    all_gpg_keys=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep "^sec" | cut -d: -f5)
+    
+    if [ -n "$all_gpg_keys" ]; then
+        show_success "Найдены существующие GPG ключи в системе:"
+        gpg --list-secret-keys --keyid-format SHORT 2>/dev/null | grep -E "^sec|^uid" | head -10
+        echo ""
+        read -p "Хотите использовать существующий GPG ключ или создать новый для ALT Team? (существующий/новый): " gpg_choice
+        
+        if [[ "$gpg_choice" =~ ^([сС]|[eE]|[сС][уУ][щЩ]|[eE][xX][iI][sS]).*$ ]]; then
+            show_success "Будем использовать существующий GPG ключ"
+            show_warning "Примечание: в конце настройки нужно будет вручную указать fingerprint в конфигурации"
+            USE_EXISTING_GPG=true
+        else
+            show_progress "Создадим новый GPG ключ с email ${USERNAME}@altlinux.org"
+            CREATE_GPG_KEY=true
+        fi
+    else
+        show_warning "GPG ключи не найдены в системе"
+        read -p "Создать новый GPG ключ для ALT Team? (да/нет): " create_gpg_response
+        if [[ "$create_gpg_response" =~ ^([дД]|[yY]|[дД][аА]|[yY][eE][sS])$ ]]; then
+            CREATE_GPG_KEY=true
+        else
+            show_warning "GPG ключ не будет создан. Настройте GPG ключ самостоятельно."
+        fi
+    fi
+fi
+
+############
+# Обработка SSH ключа
+############
+echo ""
+echo -e "\033[1;35m--- Обработка SSH ключа ---\033[0m"
+SSH_KEY_PATH="$HOME/.ssh/alt_team_ed25519"
+
+if [ "$USE_EXISTING_SSH" = true ]; then
+    # Используем существующий SSH ключ
+    if [ -f "$SSH_KEY_PATH" ]; then
+        show_success "Используем специальный SSH ключ ALT Team: $SSH_KEY_PATH"
+        # echo "Публичный ключ:"
+        # echo -e "\033[0;37m$(cat ${SSH_KEY_PATH}.pub)\033[0m"
+        
+        # Копируем публичный ключ в папку join
+        cp "${SSH_KEY_PATH}.pub" "$JOIN_DIR/ssh_public_key.pub"
+        show_success "Публичный SSH ключ скопирован в $JOIN_DIR/ssh_public_key.pub"
+    else
+        # Проверяем использует ли пользователь ssh-agent
+        echo ""
+        read -p "Используете ли вы ssh-agent для управления SSH ключами? (да/нет): " use_agent_response
+        
+        if [[ "$use_agent_response" =~ ^([дД]|[yY]|[дД][аА]|[yY][eE][sS])$ ]]; then
+            show_success "Используете ssh-agent - отлично!"
+            show_warning "SSH ключи НЕ будут копироваться, так как вы используете ssh-agent"
+            
+            # Создаем информационный файл вместо копирования ключа
+            cat > "$JOIN_DIR/ssh_public_key.pub" <<EOF
+# ИНФОРМАЦИЯ: пользователь использует ssh-agent
+# SSH ключи НЕ копируются автоматически
+# 
+# ИНСТРУКЦИИ для загрузки SSH ключа на gitery.altlinux.org:
+# 1. Выберите нужный SSH ключ из вашего ssh-agent
+# 2. Скопируйте содержимое публичного ключа (.pub файл)
+# 3. Загрузите его на https://gitery.altlinux.org в настройки SSH ключей
+#
+# Для просмотра доступных ключей: ssh-add -l
+# Для просмотра публичных ключей: ls ~/.ssh/*.pub
+#
+# Настройка: $(date)
+EOF
+            
+            show_success "Создан информационный файл в $JOIN_DIR/ssh_public_key.pub"
+            echo ""
+            echo -e "\033[1;33m📋 ИНСТРУКЦИИ для ssh-agent пользователей:\033[0m"
+            echo -e "1. Проверьте доступные ключи: \033[0;32mssh-add -l\033[0m"
+            echo -e "2. Найдите нужный публичный ключ: \033[0;32mls ~/.ssh/*.pub\033[0m"
+            echo -e "3. Скопируйте содержимое публичного ключа"
+            echo -e "4. Загрузите на https://gitery.altlinux.org"
+        else
+            # Используем первый найденный SSH ключ
+            first_ssh_key=""
+            for key in ~/.ssh/id_*; do
+                if [[ "$key" != *.pub ]] && [ -f "$key" ] && [ -f "$key.pub" ]; then
+                    first_ssh_key="$key"
+                    break
+                fi
+            done
+            
+            if [ -n "$first_ssh_key" ]; then
+                show_success "Используем существующий SSH ключ: $first_ssh_key"
+                # echo "Публичный ключ:"
+                # echo -e "\033[0;37m$(cat ${first_ssh_key}.pub)\033[0m"
+                
+                # Копируем публичный ключ в папку join
+                cp "${first_ssh_key}.pub" "$JOIN_DIR/ssh_public_key.pub"
+                show_success "Публичный SSH ключ скопирован в $JOIN_DIR/ssh_public_key.pub"
+            else
+                show_error "Не удалось найти подходящий SSH ключ"
+                show_warning "Создайте SSH ключ вручную и повторно запустите скрипт"
+            fi
+        fi
+    fi
+elif [ "$CREATE_SSH_KEY" = true ]; then
+    # Создаем новый SSH ключ для ALT Team
     show_progress "Генерируем SSH ключ ED25519 для ALT Team"
     echo "Создаем SSH ключ alt_team_ed25519 для работы с git-репозиториями ALT Linux"
     echo ""
@@ -538,29 +685,51 @@ else
     else
         show_error "Не удалось создать SSH ключ"
     fi
+else
+    show_warning "SSH ключ не будет создан или настроен автоматически"
+    echo "Настройте SSH ключ самостоятельно и скопируйте публичный ключ в $JOIN_DIR/ssh_public_key.pub"
 fi
 
-# Генерация GPG ключа  
+# Обработка GPG ключа  
 echo ""
-echo -e "\033[1;35m--- GPG ключ ---\033[0m"
+echo -e "\033[1;35m--- Обработка GPG ключа ---\033[0m"
 
-# Проверяем есть ли уже GPG ключи с нашим email
-existing_gpg_keys=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep -A5 "${USERNAME}@altlinux.org" | grep "^sec" | cut -d: -f5)
-
-if [ -n "$existing_gpg_keys" ]; then
-    show_success "GPG ключ с email ${USERNAME}@altlinux.org уже существует"
-    for key_id in $existing_gpg_keys; do
-        echo "  Ключ: $key_id"
-        # Экспортируем в файл
-        gpg --armor --export "${USERNAME}@altlinux.org" > "$JOIN_DIR/gpg_public_key.asc"
-        show_success "Публичный GPG ключ экспортирован в $JOIN_DIR/gpg_public_key.asc"
+if [ "$USE_EXISTING_GPG" = true ]; then
+    # Используем существующий GPG ключ с нашим email
+    existing_gpg_keys=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep -A5 "${USERNAME}@altlinux.org" | grep "^sec" | cut -d: -f5)
+    
+    if [ -n "$existing_gpg_keys" ]; then
+        show_success "Используем существующий GPG ключ с email ${USERNAME}@altlinux.org"
+        for key_id in $existing_gpg_keys; do
+            echo "  Ключ: $key_id"
+            # Экспортируем в файл
+            gpg --armor --export "${USERNAME}@altlinux.org" > "$JOIN_DIR/gpg_public_key.asc"
+            show_success "Публичный GPG ключ экспортирован в $JOIN_DIR/gpg_public_key.asc"
+            
+            # Получаем fingerprint для RPM конфигурации
+            gpg_fingerprint=$(LANG=C gpg --fingerprint "$key_id" | grep 'fingerprint =' | tr -d ' ' | cut -d= -f2)
+            echo "$gpg_fingerprint" > "$BACKUP_DIR/gpg_fingerprint.txt"
+            break
+        done
+    else
+        # Используем любой существующий GPG ключ
+        show_warning "GPG ключ с email ${USERNAME}@altlinux.org не найден"
+        echo "Используем существующий GPG ключ для экспорта"
         
-        # Получаем fingerprint для RPM конфигурации
-        gpg_fingerprint=$(LANG=C gpg --fingerprint "$key_id" | grep 'fingerprint =' | tr -d ' ' | cut -d= -f2)
-        echo "$gpg_fingerprint" > "$BACKUP_DIR/gpg_fingerprint.txt"
-        break
-    done
-else
+        # Находим первый доступный GPG ключ
+        first_gpg_key=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep "^sec" | cut -d: -f5 | head -1)
+        if [ -n "$first_gpg_key" ]; then
+            gpg --armor --export "$first_gpg_key" > "$JOIN_DIR/gpg_public_key.asc"
+            show_success "Публичный GPG ключ экспортирован в $JOIN_DIR/gpg_public_key.asc"
+            echo "<CHANGE_ME FROM \"gpg -k\">" > "$BACKUP_DIR/gpg_fingerprint.txt"
+            show_warning "Не забудьте вручную указать корректный GPG fingerprint в ~/.rpmmacros"
+        else
+            show_error "Не удалось найти GPG ключи"
+            echo "<CHANGE_ME FROM \"gpg -k\">" > "$BACKUP_DIR/gpg_fingerprint.txt"
+        fi
+    fi
+elif [ "$CREATE_GPG_KEY" = true ]; then
+    # Создаем новый GPG ключ для ALT Team
     show_progress "Автоматическое создание GPG ключа для ${USERNAME}@altlinux.org"
     echo "Создаем GPG ключ с рекомендуемыми параметрами ALT Linux..."
     echo ""
@@ -572,6 +741,10 @@ else
     echo "  - Email: ${USERNAME}@altlinux.org"
     echo "  - Комментарий: (пустой)"
     echo ""
+    
+    # Проверяем версию GPG для совместимости
+    GPG_VERSION=$(gpg --version | head -1 | grep -o '[0-9]\+\.[0-9]\+' | head -1)
+    echo "Обнаружена версия GPG: $GPG_VERSION"
     
     # Создаем временный файл с параметрами GPG
     GPG_BATCH_FILE=$(mktemp)
@@ -590,8 +763,10 @@ Expire-Date: 0
 EOF
 
     echo -e "\033[0;33mВведите пароль для защиты GPG ключа (рекомендуется):\033[0m"
+    echo ""
     
-    if gpg --batch --generate-key "$GPG_BATCH_FILE"; then
+    # Пробуем создать ключ с помощью batch файла
+    if gpg --batch --gen-key "$GPG_BATCH_FILE" 2>/dev/null; then
         rm -f "$GPG_BATCH_FILE"
         show_success "GPG ключ создан с рекомендуемыми параметрами"
         
@@ -610,9 +785,53 @@ EOF
         echo "  Fingerprint: $gpg_fingerprint"
     else
         rm -f "$GPG_BATCH_FILE"
-        show_error "Не удалось создать GPG ключ"
-        # Создаем заглушку
-        echo "<CHANGE_ME FROM \"gpg -k\">" > "$BACKUP_DIR/gpg_fingerprint.txt"
+        show_warning "Batch режим не сработал, попробуем интерактивное создание"
+        echo ""
+        echo "Сейчас запустится интерактивная генерация GPG ключа"
+        echo "Рекомендуемые настройки:"
+        echo "  - Тип ключа: RSA and RSA (по умолчанию)"
+        echo "  - Размер ключа: 4096 бит"
+        echo "  - Действителен: 0 = ключ никогда не истекает"
+        echo "  - Имя: $FULLNAME"
+        echo "  - Email: ${USERNAME}@altlinux.org"
+        echo "  - Комментарий: (оставьте пустым)"
+        echo ""
+        
+        if gpg --gen-key; then
+            show_success "GPG ключ создан в интерактивном режиме"
+            
+            # Экспортируем публичный ключ
+            gpg --armor --export "${USERNAME}@altlinux.org" > "$JOIN_DIR/gpg_public_key.asc"
+            show_success "Публичный GPG ключ экспортирован в $JOIN_DIR/gpg_public_key.asc"
+            
+            # Получаем ID и fingerprint
+            new_key_id=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep -A5 "${USERNAME}@altlinux.org" | grep "^sec" | cut -d: -f5 | head -1)
+            gpg_fingerprint=$(LANG=C gpg --fingerprint "$new_key_id" | grep 'fingerprint =' | tr -d ' ' | cut -d= -f2)
+            echo "$gpg_fingerprint" > "$BACKUP_DIR/gpg_fingerprint.txt"
+            
+            echo ""
+            echo "GPG ключ создан:"
+            echo "  ID: $new_key_id"
+            echo "  Fingerprint: $gpg_fingerprint"
+        else
+            show_error "Не удалось создать GPG ключ"
+            echo "<CHANGE_ME FROM \"gpg -k\">" > "$BACKUP_DIR/gpg_fingerprint.txt"
+        fi
+    fi
+else
+    show_warning "GPG ключ не будет создан автоматически"
+    echo "Настройте GPG ключ самостоятельно и обновите конфигурацию"
+    echo "<CHANGE_ME FROM \"gpg -k\">" > "$BACKUP_DIR/gpg_fingerprint.txt"
+    
+    # Если есть существующие ключи, экспортируем первый найденный
+    first_gpg_key=$(gpg --list-secret-keys --with-colons 2>/dev/null | grep "^sec" | cut -d: -f5 | head -1)
+    if [ -n "$first_gpg_key" ]; then
+        gpg --armor --export "$first_gpg_key" > "$JOIN_DIR/gpg_public_key.asc"
+        show_success "Экспортирован публичный ключ существующего GPG ключа в $JOIN_DIR/gpg_public_key.asc"
+        show_warning "Проверьте, что это правильный ключ для ALT Linux Team"
+    else
+        echo "# Публичный GPG ключ не найден" > "$JOIN_DIR/gpg_public_key.asc"
+        echo "# Создайте GPG ключ и экспортируйте его в этот файл" >> "$JOIN_DIR/gpg_public_key.asc"
     fi
 fi
 
@@ -656,10 +875,10 @@ if is_git_configured; then
         fi
     fi
     
-    echo ""
-    echo -e "\033[0;37m--- Текущая конфигурация git Alt-team ($CONFIG_PATH) ---\033[0m"
-    cat "$CONFIG_PATH"
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo ""
+    # echo -e "\033[0;37m--- Текущая конфигурация git Alt-team ($CONFIG_PATH) ---\033[0m"
+    # cat "$CONFIG_PATH"
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
 else
     show_progress "Создаем рабочую директорию: $TEAM_DIR"
     mkdir -p "$TEAM_DIR"
@@ -726,9 +945,9 @@ EOF
 
     echo ""
     echo -e '\033[1;37m############\n# Git конфигурация\n############\033[0m'
-    echo ""
-    echo -e "\033[0;37m--- Основной gitconfig (~/.gitconfig) ---\033[0m"
-    cat ~/.gitconfig
+    # echo ""
+    # echo -e "\033[0;37m--- Основной gitconfig (~/.gitconfig) ---\033[0m"
+    # cat ~/.gitconfig
 
     echo ""
     echo -e "\033[0;37m--- Конфигурация git Alt-team ($CONFIG_PATH) ---\033[0m"
@@ -747,9 +966,9 @@ echo -e "\033[1;36m=== НАСТРОЙКА SSH ===\033[0m"
 if is_ssh_configured; then
     show_success "SSH уже настроен для ALT серверов"
     echo ""
-    echo -e "\033[0;37m--- Текущая SSH конфигурация (~/.ssh/config) ---\033[0m"
-    cat ~/.ssh/config
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo -e "\033[0;37m--- Текущая SSH конфигурация (~/.ssh/config) ---\033[0m"
+    # cat ~/.ssh/config
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
 else
     show_progress "Настраиваем SSH конфигурацию для ALT серверов"
 
@@ -762,6 +981,9 @@ else
     chmod 600 ~/.ssh/config
 
     if ! grep -q "gitery.altlinux.org" ~/.ssh/config; then
+        # Определяем нужно ли добавлять IdentityFile
+        if [ "$CREATE_SSH_KEY" = true ] || [ -f "$SSH_KEY_PATH" ]; then
+            # Добавляем конфигурацию с IdentityFile для ALT Team ключа
 cat << EOF >> ~/.ssh/config
 
 # ALT Linux Team - используем alt_team_ed25519 ключ
@@ -778,15 +1000,32 @@ Host gyle
     Port 222
     IdentityFile ~/.ssh/alt_team_ed25519
 EOF
+        else
+            # Добавляем конфигурацию без IdentityFile (будет использовать существующие ключи)
+cat << EOF >> ~/.ssh/config
+
+# ALT Linux Team - используем системные SSH ключи
+Host gitery
+    HostName gitery.altlinux.org
+    User alt_${USERNAME}
+    Port 222
+
+# Сборочница
+Host gyle
+    HostName gyle.altlinux.org
+    User alt_${USERNAME}
+    Port 222
+EOF
+        fi
         show_success "SSH конфигурация добавлена"
     else
         show_warning "SSH конфигурация для ALT серверов уже существует"
     fi
 
-    echo ""
-    echo -e "\033[0;37m--- Текущая SSH конфигурация (~/.ssh/config) ---\033[0m"
-    cat ~/.ssh/config
-    echo -e "\033[0;37m--- Конец файла ---\033[0m"
+    # echo ""
+    # echo -e "\033[0;37m--- Текущая SSH конфигурация (~/.ssh/config) ---\033[0m"
+    # cat ~/.ssh/config
+    # echo -e "\033[0;37m--- Конец файла ---\033[0m"
 fi
 
 echo ""
@@ -996,73 +1235,124 @@ echo ""
 echo -e "\033[1;36m=== НАСТРОЙКА ЗАВЕРШЕНА ===\033[0m"
 echo ""
 
-echo -e "\e[96mTL;DR полезных команд\e[39m
+echo -e "\033[96mTL;DR полезных команд\033[39m
 
-\e[93m## Загрузить пакет ##\e[39m
+\033[93m## Загрузить пакет ##\033[39m
 
 - Проверка наличия пакета в Сизифе
-    \e[92mrpmgp -c название_пакета\e[39m
+    \033[92mrpmgp -c название_пакета\033[39m
 
 - Загрузка уже собранного в Сизиф пакета
-    \e[92mrpmgp -g neofetch\e[39m
+    \033[92mrpmgp -g neofetch\033[39m
 
-\e[93m## Сборка в системе ##\e[39m
+\033[93m## Сборка в системе ##\033[39m
 
 - Собрать пакет в системе
-    \e[92mrpmbb\e[39m
+    \033[92mrpmbb\033[39m
 
 - Отладить только шаг установки файлов
-    \e[92mrpmbb -i\e[39m
+    \033[92mrpmbb -i\033[39m
 
 - Отладить только шаг упаковки пакета
-    \e[92mrpmbb -p\e[39m
+    \033[92mrpmbb -p\033[39m
 
-\e[93m## Сборка в Hasher ##\e[39m
+\033[93m## Сборка в Hasher ##\033[39m
 
 - Собрать пакет в hasher
-    \e[92mrpmbsh\e[39m
+    \033[92mrpmbsh\033[39m
 
 - Собрать и установить '-i' внутри и отправить '-u' в Сизиф
-    \e[92mrpmbsh -i\e[39m
+    \033[92mrpmbsh -i\033[39m
 
-\e[93m## Отправка пакета ##\e[39m
+\033[93m## Отправка пакета ##\033[39m
 
 - Отправить пакет на сборку в Сизиф
-    \e[92mrpmbs -u\e[39m
+    \033[92mrpmbs -u\033[39m
 
-\e[93m## Обновление пакета ##\e[39m
+\033[93m## Обновление пакета ##\033[39m
 
 - Обновление исходников, если в Source указан URL к файлу с исходниками:
         - # Source-url: http://example.com/%name/%name-%version.zip
         - # Source-git: http://github.com/user/repo.git
 
-    \e[92mrpmgs [-f] %новая версия, как в тегах%\e[39m
+    \033[92mrpmgs [-f] %новая версия, как в тегах%\033[39m
 
 - Автоматическое обновление, скачает обновление, соберёт, запустит тест и после отправит в Сизиф
-    \e[92mrpmrb новая_версия\e[39m
+    \033[92mrpmrb новая_версия\033[39m
 
 Полезные ссылки: 
-- \e[94mhttps://www.altlinux.org/Сборка_пакетов_(etersoft-build-utils)\e[39m -  Короткий и быстрый старт
-- \e[94mhttps://alt-packaging-guide.github.io\e[39m - Руководство о сборке пакетов
-- \e[94mhttps://www.altlinux.org/Etersoft-build-utils_howto\e[39m - Полное руководство по Этерсофт утилит
+- \033[94mhttps://www.altlinux.org/Сборка_пакетов_(etersoft-build-utils)\033[39m -  Короткий и быстрый старт
+- \033[94mhttps://alt-packaging-guide.github.io\033[39m - Руководство о сборке пакетов
+- \033[94mhttps://www.altlinux.org/Etersoft-build-utils_howto\033[39m - Полное руководство по Этерсофт утилит
 
-\e[32m✓ Среда настроена и готова к работе!\e[39m
+\033[32m✓ Среда настроена и готова к работе!\033[39m
 
-\e[91m🔑 ВАЖНЫЕ СЛЕДУЮЩИЕ ШАГИ:\e[39m
-1. \e[93mВыйдите и зайдите в сессию заново\e[39m для применения настроек hasher
-2. \e[93mЗагрузите SSH ключ на gitery.altlinux.org\e[39m:
-   - Публичный ключ: \e[1;32m$JOIN_DIR/ssh_public_key.pub\e[39m
-3. \e[93mОтправьте GPG ключ координатору команды\e[39m:
-   - Публичный ключ: \e[1;32m$JOIN_DIR/gpg_public_key.asc\e[39m
+\033[91m🔑 ВАЖНЫЕ СЛЕДУЮЩИЕ ШАГИ:\033[39m
+1. \033[93mВыйдите и зайдите в сессию заново\033[39m для применения настроек hasher"
 
-\e[96m📦 ВАЖНАЯ СТРУКТУРА ДЛЯ СОХРАНЕНИЯ:\e[39m
-\e[1;33m$TEAM_DIR\e[39m
+# Условные сообщения в зависимости от конфигурации ключей
+step_counter=2
+
+# SSH ключ
+if [ -f "$JOIN_DIR/ssh_public_key.pub" ]; then
+    if [ "$CREATE_SSH_KEY" = true ]; then
+        echo -e "$step_counter. \033[93mЗагрузите SSH ключ на gitery.altlinux.org\033[39m:"
+        echo -e "   - Публичный ключ: \033[1;32m$JOIN_DIR/ssh_public_key.pub\033[39m"
+        echo -e "   - \033[93mИспользуйте созданный специальный ключ alt_team_ed25519\033[39m"
+        step_counter=$((step_counter + 1))
+    elif [ "$USE_EXISTING_SSH" = true ]; then
+        # Проверяем что это информационный файл с ssh-agent инструкциями
+        if grep -q "ssh-agent" "$JOIN_DIR/ssh_public_key.pub" 2>/dev/null; then
+            echo -e "$step_counter. \033[93mНастройте SSH для ssh-agent пользователей\033[39m:"
+            echo -e "   - \033[96mВы используете ssh-agent - ключи НЕ копируются автоматически\033[39m"
+            echo -e "   - Проверьте доступные ключи: \033[33mssh-add -l\033[39m"
+            echo -e "   - Просмотрите публичные ключи: \033[33mls ~/.ssh/*.pub\033[39m"
+            echo -e "   - \033[91mЗагрузите нужный публичный ключ на gitery.altlinux.org\033[39m"
+            echo -e "   - Проверьте соединение: \033[33mssh -T git@gitery.altlinux.org\033[39m"
+        else
+            echo -e "$step_counter. \033[93mПроверьте SSH ключи для ALT Linux\033[39m:"
+            echo -e "   - Публичный ключ скопирован: \033[1;32m$JOIN_DIR/ssh_public_key.pub\033[39m"
+            echo -e "   - Загрузите на gitery.altlinux.org"
+            echo -e "   - Проверьте соединение: \033[33mssh -T git@gitery.altlinux.org\033[39m"
+        fi
+        step_counter=$((step_counter + 1))
+    fi
+else
+    echo -e "$step_counter. \033[91mСоздайте и загрузите SSH ключ\033[39m:"
+    echo -e "   - Создайте SSH ключ: \033[33mssh-keygen -t ed25519 -C \"${USERNAME}@altlinux.org\"\033[39m"
+    echo -e "   - Скопируйте публичный ключ в \033[1;32m$JOIN_DIR/ssh_public_key.pub\033[39m"
+    echo -e "   - Загрузите на gitery.altlinux.org"
+    step_counter=$((step_counter + 1))
+fi
+
+# GPG ключ
+if [ -f "$JOIN_DIR/gpg_public_key.asc" ] && [ -s "$JOIN_DIR/gpg_public_key.asc" ]; then
+    echo -e "$step_counter. \033[93mОтправьте GPG ключ координатору команды\033[39m:"
+    echo -e "   - Публичный ключ: \033[1;32m$JOIN_DIR/gpg_public_key.asc\033[39m"
+    
+    # Проверяем нужно ли обновить fingerprint
+    if grep -q "<CHANGE_ME" "$BACKUP_DIR/gpg_fingerprint.txt" 2>/dev/null; then
+        echo -e "   - \033[91mОБЯЗАТЕЛЬНО\033[39m: обновите GPG fingerprint в ~/.rpmmacros"
+        echo -e "     Команда: \033[33mgpg --fingerprint\033[39m"
+    fi
+    step_counter=$((step_counter + 1))
+else
+    echo -e "$step_counter. \033[91mСоздайте и настройте GPG ключ\033[39m:"
+    echo -e "   - Создайте GPG ключ: \033[33mgpg --gen-key\033[39m"
+    echo -e "   - Экспортируйте: \033[33mgpg --armor --export ${USERNAME}@altlinux.org > $JOIN_DIR/gpg_public_key.asc\033[39m"
+    echo -e "   - Обновите fingerprint в ~/.rpmmacros"
+    step_counter=$((step_counter + 1))
+fi
+
+echo ""
+echo -e "\033[96m📦 ВАЖНАЯ СТРУКТУРА ДЛЯ СОХРАНЕНИЯ:\033[39m
+\033[1;33m$TEAM_DIR\033[39m
 ├── join/ - файлы для отправки (публичные ключи)
 ├── backup/ - конфигурация и скрипт восстановления
 └── README.md - инструкции
 Скопируйте эту папку в надежное место!
 
-\e[36mВсе проекты ALT размещайте в директории:\e[39m \e[1;32m$TEAM_DIR\e[39m"
+\033[36mВсе проекты ALT размещайте в директории:\033[39m \033[1;32m$TEAM_DIR\033[39m"
 
 echo ""
 show_success "Настройка успешно завершена! Добро пожаловать в команду ALT Linux!"
