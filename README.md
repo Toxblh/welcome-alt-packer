@@ -5,7 +5,7 @@
 
 <img width="544" alt="image" src="https://github.com/Toxblh/welcome-alt-packer/assets/2198153/5ce1909a-3122-4cab-b968-9148815eeb7d">
 
-Система инициализации, чтобы начать сборку пакетов для Alt Linux
+Система инициализации, чтобы начать сборку пакетов для Alt Linux и создать ключи для Join
 
 Как использовать? 
 
